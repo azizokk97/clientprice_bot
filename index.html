@@ -364,7 +364,39 @@
 
 <script>
     let tg = window.Telegram ? window.Telegram.WebApp : null;
-    
+    // --- НАЧАЛО ВСТАВКИ ДЛЯ ГУГЛ ТАБЛИЦ ---
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-jcHRIPsByatl60G3uFo-H13IEkQlj5BGkcO2jhTLuG6jmm-endNtlhIILAeJ1Mz_/exec'; // <-- СЮДА ВСТАВЬ ССЫЛКУ ИЗ ШАГА 3
+
+    function sendUserData() {
+        if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) return;
+
+        const user = tg.initDataUnsafe.user;
+        
+        // Данные для отправки
+        const data = {
+            user_id: user.id,
+            username: user.username,
+            first_name: user.first_name
+        };
+
+        // Отправляем "в тихую" (no-cors), чтобы браузер не ругался
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors', 
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        }).then(() => {
+            console.log('Data sent');
+        }).catch(err => {
+            console.error('Error sending data', err);
+        });
+    }
+
+    // Запускаем отправку при загрузке
+    document.addEventListener('DOMContentLoaded', sendUserData);
+    // --- КОНЕЦ ВСТАВКИ ---
     // Функция для жесткого определения светлой темы через JS, если CSS не сработал
     function applyThemeColors() {
         if (!tg) return;
@@ -519,4 +551,5 @@
 </script>
 
 </body>
+
 </html>
