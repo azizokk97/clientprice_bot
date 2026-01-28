@@ -12,10 +12,6 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* CSS ПЕРЕМЕННЫЕ
-           Мы используем системные цвета Telegram, но для кнопок
-           сделаем переопределение ниже в медиа-запросе 
-        */
         :root {
             --tg-bg: var(--tg-theme-bg-color, #ffffff);
             --tg-text: var(--tg-theme-text-color, #000000);
@@ -27,18 +23,13 @@
             --main-btn-text: var(--tg-theme-button-text-color, #ffffff);
         }
 
-        /* ХИТРОСТЬ ДЛЯ СВЕТЛОЙ ТЕМЫ:
-           Telegram не дает прямого CSS-класса "light-mode", но мы можем определить его,
-           проверив, является ли фон светлым. Если фон НЕ черный/темный -> делаем кнопки черными.
-        */
         @media (prefers-color-scheme: light) {
             :root {
-                --main-btn-bg: #000000 !important; /* Черная кнопка днем */
+                --main-btn-bg: #000000 !important;
                 --main-btn-text: #ffffff !important;
             }
         }
         
-        /* Дополнительная страховка: если телеграм передает белый фон, красим кнопки в черный */
         body[style*="background-color: #ffffff"], 
         body[style*="background-color: rgb(255, 255, 255)"] {
             --main-btn-bg: #000000 !important;
@@ -73,7 +64,7 @@
 
         p.subtitle {
             color: var(--tg-hint);
-            font-size: 13px; /* Чуть уменьшил, так как текста стало больше */
+            font-size: 13px;
             text-align: center;
             margin-bottom: 25px;
             font-weight: 500;
@@ -118,7 +109,7 @@
         }
 
         input[type="number"]:focus {
-            border-color: var(--main-btn-bg); /* Рамка цвета кнопки */
+            border-color: var(--main-btn-bg);
         }
 
         .select-grid {
@@ -131,7 +122,6 @@
             grid-template-columns: 1fr;
         }
 
-        /* Кнопки выбора (Radio buttons) */
         .radio-btn {
             background: var(--tg-bg);
             border: 1px solid transparent;
@@ -147,16 +137,15 @@
         }
 
         .radio-btn.active {
-            background: var(--main-btn-bg); /* Используем наш кастомный цвет */
+            background: var(--main-btn-bg);
             color: var(--main-btn-text);
             font-weight: 700;
             transform: scale(1.02);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
-        /* Главная кнопка расчета */
         .btn-calc {
-            background: var(--main-btn-bg); /* Черный днем, системный ночью */
+            background: var(--main-btn-bg);
             color: var(--main-btn-text);
             width: 100%;
             padding: 18px;
@@ -175,7 +164,6 @@
             opacity: 0.9;
         }
 
-        /* Шторка результата */
         .result-overlay {
             position: fixed;
             bottom: 0;
@@ -280,7 +268,6 @@
             transform: scale(0.98);
         }
 
-        /* Кнопка "Отправить" тоже наследует черный цвет */
         .btn-primary-act {
             background: var(--main-btn-bg);
             color: var(--main-btn-text);
@@ -364,48 +351,63 @@
 
 <script>
     let tg = window.Telegram ? window.Telegram.WebApp : null;
-    // --- НАЧАЛО ВСТАВКИ ДЛЯ ГУГЛ ТАБЛИЦ ---
-    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-jcHRIPsByatl60G3uFo-H13IEkQlj5BGkcO2jhTLuG6jmm-endNtlhIILAeJ1Mz_/exec'; // <-- СЮДА ВСТАВЬ ССЫЛКУ ИЗ ШАГА 3
+
+    // --- ЛОГИКА ОТПРАВКИ ДАННЫХ В ГУГЛ ТАБЛИЦУ ---
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-jcHRIPsByatl60G3uFo-H13IEkQlj5BGkcO2jhTLuG6jmm-endNtlhIILAeJ1Mz_/exec';
 
     function sendUserData() {
-        if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) return;
+        // Проверяем, есть ли данные пользователя (только внутри Telegram)
+        if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+            console.log("Не в Телеграм, отправка невозможна");
+            return;
+        }
 
         const user = tg.initDataUnsafe.user;
-        
-        // Данные для отправки
         const data = {
             user_id: user.id,
-            username: user.username,
-            first_name: user.first_name
+            username: user.username || 'No Username',
+            first_name: user.first_name || 'No Name'
         };
 
-        // Отправляем "в тихую" (no-cors), чтобы браузер не ругался
+        const jsonString = JSON.stringify(data);
+        const blob = new Blob([jsonString], {type: 'text/plain'});
+
+        // Способ 1: sendBeacon (лучше работает на мобильных)
+        if (navigator.sendBeacon) {
+            const success = navigator.sendBeacon(GOOGLE_SCRIPT_URL, blob);
+            if (success) {
+                console.log("Данные отправлены через Beacon");
+                return;
+            }
+        }
+
+        // Способ 2: fetch (запасной вариант)
         fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
             mode: 'no-cors', 
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'text/plain' // ВАЖНО: text/plain чтобы не блокировал Google
             },
-            body: JSON.stringify(data)
+            body: jsonString
         }).then(() => {
-            console.log('Data sent');
+            console.log('Данные отправлены через Fetch');
         }).catch(err => {
-            console.error('Error sending data', err);
+            console.error('Ошибка отправки:', err);
         });
     }
 
-    // Запускаем отправку при загрузке
-    document.addEventListener('DOMContentLoaded', sendUserData);
-    // --- КОНЕЦ ВСТАВКИ ---
-    // Функция для жесткого определения светлой темы через JS, если CSS не сработал
+    // Запускаем через 1 секунду после загрузки, чтобы Telegram точно подгрузился
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(sendUserData, 1000);
+    });
+    // --- КОНЕЦ БЛОКА ОТПРАВКИ ---
+
+
+    // --- ДАЛЕЕ ИДЕТ КОД КАЛЬКУЛЯТОРА ---
+
     function applyThemeColors() {
         if (!tg) return;
-        
-        // Получаем цвет фона из параметров темы Telegram
         const bgColor = tg.themeParams.bg_color || '#ffffff';
-        
-        // Простая проверка: если фон светлый (белый или около того)
-        // #ffffff, #f0f0f0 и т.д. считаем светлой темой
         const isLight = bgColor.toLowerCase() === '#ffffff' || bgColor.toLowerCase() === '#f2f2f7';
         
         const root = document.documentElement;
@@ -413,7 +415,6 @@
             root.style.setProperty('--main-btn-bg', '#000000');
             root.style.setProperty('--main-btn-text', '#ffffff');
         } else {
-            // Если темная тема - возвращаем системный цвет
             root.style.setProperty('--main-btn-bg', 'var(--tg-theme-button-color, #2481cc)');
             root.style.setProperty('--main-btn-text', 'var(--tg-theme-button-text-color, #ffffff)');
         }
@@ -423,7 +424,6 @@
         tg.expand();
         tg.setHeaderColor(getComputedStyle(document.body).getPropertyValue('--tg-bg'));
         tg.MainButton.hide();
-        // Применяем цвета при старте и при смене темы
         applyThemeColors();
         tg.onEvent('themeChanged', applyThemeColors);
     }
@@ -551,5 +551,4 @@
 </script>
 
 </body>
-
 </html>
